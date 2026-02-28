@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 
 const VALID_MEAL_TYPES = ["아침", "점심", "저녁", "간식"];
 
+export async function GET() {
+  const meals = await prisma.meal.findMany({
+    orderBy: [{ date: "desc" }, { mealType: "asc" }],
+  });
+
+  return NextResponse.json(meals);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

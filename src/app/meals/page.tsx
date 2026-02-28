@@ -3,10 +3,52 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const MEAL_TYPE_BADGE: Record<string, string> = {
+  "아침": "bg-blue-100 text-blue-800",
+  "점심": "bg-green-100 text-green-800",
+  "저녁": "bg-orange-100 text-orange-800",
+  "간식": "bg-purple-100 text-purple-800",
+};
+
+function formatDateKorean(date: Date): string {
+  return date.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  });
+}
+
 export default async function MealsPage() {
   const meals = await prisma.meal.findMany({
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ date: "desc" }, { mealType: "asc" }],
   });
+
+  if (meals.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <p className="text-lg text-gray-500 dark:text-gray-400">
+          기록된 식단이 없습니다
+        </p>
+        <Link
+          href="/meals/new"
+          className="mt-4 inline-block text-blue-600 hover:underline"
+        >
+          첫 식단을 입력해보세요
+        </Link>
+      </div>
+    );
+  }
+
+  // Group meals by date
+  const grouped = new Map<string, typeof meals>();
+  for (const meal of meals) {
+    const key = new Date(meal.date).toISOString().split("T")[0];
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(meal);
+  }
 
   return (
     <div>
@@ -22,52 +64,44 @@ export default async function MealsPage() {
         </Link>
       </div>
 
-      {meals.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-950">
-          <p className="text-gray-500 dark:text-gray-400">
-            등록된 식단이 없습니다.
-          </p>
-          <Link
-            href="/meals/new"
-            className="mt-4 inline-block text-blue-600 hover:underline"
-          >
-            첫 식단을 입력해보세요
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {meals.map((meal) => (
-            <div
-              key={meal.id}
-              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+      <div className="space-y-8">
+        {Array.from(grouped.entries()).map(([dateKey, dateMeals]) => (
+          <section key={dateKey}>
+            <h2 className="mb-3 text-lg font-semibold text-gray-700 dark:text-gray-300">
+              {formatDateKorean(new Date(dateKey + "T00:00:00"))}
+            </h2>
+            <ul className="space-y-2">
+              {dateMeals.map((meal) => (
+                <li
+                  key={meal.id}
+                  className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${MEAL_TYPE_BADGE[meal.mealType] ?? "bg-gray-100 text-gray-800"}`}
+                    >
                       {meal.mealType}
                     </span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(meal.date).toLocaleDateString("ko-KR")}
+                    <span className="text-gray-900 dark:text-white">
+                      {meal.foodName}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {meal.foodName}
-                  </h3>
-                </div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {meal.calories} kcal
-                </span>
-              </div>
-              <div className="mt-2 flex gap-4 text-sm text-gray-500 dark:text-gray-400">
-                <span>탄수화물 {meal.carbs}g</span>
-                <span>단백질 {meal.protein}g</span>
-                <span>지방 {meal.fat}g</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <span>탄 {meal.carbs}g</span>
+                      <span>단 {meal.protein}g</span>
+                      <span>지 {meal.fat}g</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {meal.calories} kcal
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
